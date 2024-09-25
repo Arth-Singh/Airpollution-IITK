@@ -182,23 +182,21 @@ def main():
             st.success(f"New AQI: {new_aqi:.2f}")
             st.info(f"Policy Impact: {impact:.2f}")
 
-            # Visualize the impact
+            
             fig, ax = plt.subplots()
-            sns.barplot(x=['Base AQI', 'New AQI'], y=[base_aqi, new_aqi], ax=ax)
-            ax.set_ylabel('AQI')
-            ax.set_title('Policy Impact on AQI')
-            st.pyplot(fig)
+    sns.barplot(x=['Base AQI', 'New AQI'], y=[base_aqi, new_aqi], ax=ax)
+    ax.set_ylabel('AQI')
+    ax.set_title('Policy Impact on AQI')
+    st.pyplot(fig)
 
-    elif page == "Map Visualization":
-        st.header("AQI Map Visualization")
-        
-        elif page == "Map Visualization":
+elif page == "Map Visualization":
     st.header("Global AQI Map Visualization")
     
     # Prepare data for map
     city_data = df.groupby('Original_City').agg({
         'AQI': 'mean'
     }).reset_index()
+   
 
     # Add latitude and longitude for major global cities
     city_coordinates = {
