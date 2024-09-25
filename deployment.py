@@ -123,11 +123,24 @@ def main():
         
         # Create input fields for features
         input_data = {}
-        for feature in feature_names:
-            if feature.startswith('City_') or feature.startswith('Season_'):
-                input_data[feature] = st.selectbox(f"Select {feature}", [0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-            else:
-                input_data[feature] = st.number_input(f"Enter {feature}", value=0.0)
+
+        # City selection dropdown
+        city_columns = [col for col in feature_names if col.startswith('City_')]
+        selected_city = st.selectbox("Select City", [col.replace('City_', '') for col in city_columns])
+        for city_col in city_columns:
+            input_data[city_col] = 1 if city_col == f'City_{selected_city}' else 0
+
+        # Season selection dropdown
+        season_columns = [col for col in feature_names if col.startswith('Season_')]
+        selected_season = st.selectbox("Select Season", [col.replace('Season_', '') for col in season_columns])
+        for season_col in season_columns:
+            input_data[season_col] = 1 if season_col == f'Season_{selected_season}' else 0
+
+        # Sliders for numerical inputs
+        numerical_features = [f for f in feature_names if not f.startswith(('City_', 'Season_'))]
+        for feature in numerical_features:
+            # You might want to adjust min_value and max_value based on your data
+            input_data[feature] = st.slider(f"{feature}", min_value=0.0, max_value=500.0, value=0.0, step=0.1)
 
         if st.button("Predict AQI"):
             prediction = predict_aqi(input_data)
@@ -139,11 +152,23 @@ def main():
         # Create input fields for base scenario
         st.subheader("Base Scenario")
         base_input = {}
-        for feature in feature_names:
-            if feature.startswith('City_') or feature.startswith('Season_'):
-                base_input[feature] = st.selectbox(f"Base {feature}", [0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-            else:
-                base_input[feature] = st.number_input(f"Base {feature}", value=0.0)
+        
+        # City selection dropdown for base scenario
+        city_columns = [col for col in feature_names if col.startswith('City_')]
+        selected_city = st.selectbox("Select Base City", [col.replace('City_', '') for col in city_columns])
+        for city_col in city_columns:
+            base_input[city_col] = 1 if city_col == f'City_{selected_city}' else 0
+
+        # Season selection dropdown for base scenario
+        season_columns = [col for col in feature_names if col.startswith('Season_')]
+        selected_season = st.selectbox("Select Base Season", [col.replace('Season_', '') for col in season_columns])
+        for season_col in season_columns:
+            base_input[season_col] = 1 if season_col == f'Season_{selected_season}' else 0
+
+        # Sliders for numerical inputs in base scenario
+        numerical_features = [f for f in feature_names if not f.startswith(('City_', 'Season_'))]
+        for feature in numerical_features:
+            base_input[feature] = st.slider(f"Base {feature}", min_value=0.0, max_value=500.0, value=0.0, step=0.1)
 
         # Create input fields for policy changes
         st.subheader("Policy Changes (% change)")
