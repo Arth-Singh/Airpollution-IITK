@@ -12,17 +12,18 @@ from sklearn.preprocessing import StandardScaler
 # Load the saved model and scaler
 @st.cache_resource
 def load_model():
-    model = joblib.load('/teamspace/studios/this_studio/xgboost_aqi_model_20240925_185455.joblib')
-    scaler = joblib.load('/teamspace/studios/this_studio/scaler.joblib')
-    feature_names = joblib.load('/teamspace/studios/this_studio/feature_names.joblib')
+    model = joblib.load('models/xgboost_aqi_model_20240925_185455.joblib')
+    scaler = joblib.load('models/scaler.joblib')
+    feature_names = joblib.load('models/feature_names.joblib')
     return model, scaler, feature_names
+
 
 model, scaler, feature_names = load_model()
 
 # Load and preprocess the dataset
 @st.cache_data
 def load_data():
-    df = pd.read_csv('/teamspace/studios/this_studio/city_day.csv', parse_dates=['Date'])
+    df = pd.read_csv('data/city_day.csv', parse_dates=['Date'])
     
     # Feature engineering (similar to your original script)
     df['Year'] = df['Date'].dt.year
