@@ -12,50 +12,60 @@ from sklearn.preprocessing import StandardScaler
 # Load the saved model and scaler
 @st.cache_resource
 def load_model():
-    model = joblib.load('models/xgboost_aqi_model_20240925_185455.joblib')
-    scaler = joblib.load('models/scaler.joblib')
-    feature_names = joblib.load('models/feature_names.joblib')
-    return model, scaler, feature_names
-
+    try:
+        model = joblib.load('models/xgboost_aqi_model_20240925_185455.joblib')
+        scaler = joblib.load('models/scaler.joblib')
+        feature_names = joblib.load('models/feature_names.joblib')
+        return model, scaler, feature_names
+    except FileNotFoundError as e:
+        st.error(f"Error loading model files: {e}")
+        return None, None, None
 
 model, scaler, feature_names = load_model()
 
 # Load and preprocess the dataset
 @st.cache_data
 def load_data():
-    df = pd.read_csv('data/city_day.csv', parse_dates=['Date'])
-    
-    # Feature engineering (similar to your original script)
-    df['Year'] = df['Date'].dt.year
-    df['Month'] = df['Date'].dt.month
-    df['Day'] = df['Date'].dt.day
-    df['DayOfWeek'] = df['Date'].dt.dayofweek
-    df['IsWeekend'] = df['DayOfWeek'].isin([5, 6]).astype(int)
+    try:
+        df = pd.read_csv('data/city_day.csv', parse_dates=['Date'])
+        
+        # Feature engineering
+        df['Year'] = df['Date'].dt.year
+        df['Month'] = df['Date'].dt.month
+        df['Day'] = df['Date'].dt.day
+        df['DayOfWeek'] = df['Date'].dt.dayofweek
+        df['IsWeekend'] = df['DayOfWeek'].isin([5, 6]).astype(int)
 
-    def get_season(month):
-        if month in [12, 1, 2]:
-            return 'Winter'
-        elif month in [3, 4, 5]:
-            return 'Spring'
-        elif month in [6, 7, 8]:
-            return 'Summer'
-        else:
-            return 'Autumn'
+        def get_season(month):
+            if month in [12, 1, 2]:
+                return 'Winter'
+            elif month in [3, 4, 5]:
+                return 'Spring'
+            elif month in [6, 7, 8]:
+                return 'Summer'
+            else:
+                return 'Autumn'
 
-    df['Season'] = df['Month'].apply(get_season)
+        df['Season'] = df['Month'].apply(get_season)
 
-    # Calculate rolling averages
-    for col in ['PM2.5', 'PM10', 'NO', 'NO2', 'NOx', 'NH3', 'CO', 'SO2', 'O3', 'Benzene', 'Toluene', 'Xylene']:
-        df[f'{col}_Rolling_Mean_7'] = df.groupby('City')[col].transform(lambda x: x.rolling(window=7, min_periods=1).mean())
+        # Calculate rolling averages
+        for col in ['PM2.5', 'PM10', 'NO', 'NO2', 'NOx', 'NH3', 'CO', 'SO2', 'O3', 'Benzene', 'Toluene', 'Xylene']:
+            df[f'{col}_Rolling_Mean_7'] = df.groupby('City')[col].transform(lambda x: x.rolling(window=7, min_periods=1).mean())
 
-    # Create lag features
-    for col in ['AQI', 'PM2.5', 'PM10']:
-        df[f'{col}_Lag_1'] = df.groupby('City')[col].shift(1)
+        # Create lag features
+        for col in ['AQI', 'PM2.5', 'PM10']:
+            df[f'{col}_Lag_1'] = df.groupby('City')[col].shift(1)
 
-    # One-hot encode the 'City' and 'Season' columns
-    df = pd.get_dummies(df, columns=['City', 'Season'], prefix=['City', 'Season'])
+        # Save original City column
+        df['Original_City'] = df['City']
 
-    return df
+        # One-hot encode the 'City' and 'Season' columns
+        df = pd.get_dummies(df, columns=['City', 'Season'], prefix=['City', 'Season'])
+
+        return df
+    except FileNotFoundError as e:
+        st.error(f"Error loading data: {e}")
+        return None
 
 df = load_data()
 
@@ -101,6 +111,10 @@ def simulate_policy_impact(base_input, policy_changes):
 def main():
     st.title("AQI Prediction and Policy Impact Simulator")
 
+    if df is None or model is None:
+        st.error("Failed to load data or model. Please check the error messages above.")
+        return
+
     # Sidebar for navigation
     page = st.sidebar.selectbox("Choose a page", ["Prediction", "Policy Simulator", "Map Visualization"])
 
@@ -134,7 +148,7 @@ def main():
         # Create input fields for policy changes
         st.subheader("Policy Changes (% change)")
         policy_changes = {}
-        for feature in ['PM2.5', 'PM10', 'NO', 'NO2', 'CO', 'SO2']:  # Add more relevant features
+        for feature in ['PM2.5', 'PM10', 'NO', 'NO2', 'CO', 'SO2']:
             policy_changes[feature] = st.slider(f"Change in {feature}", -100.0, 100.0, 0.0) / 100
 
         if st.button("Simulate Policy Impact"):
@@ -154,25 +168,34 @@ def main():
         st.header("AQI Map Visualization")
         
         # Prepare data for map
-        map_data = df.groupby('City').agg({
-            'AQI': 'mean',
-            'Latitude': 'first',  # You need to add these columns to your dataset
-            'Longitude': 'first'
+        city_data = df.groupby('Original_City').agg({
+            'AQI': 'mean'
         }).reset_index()
+
+        # Add latitude and longitude (you'll need to provide this data)
+        city_coordinates = {
+            'Delhi': (28.6139, 77.2090),
+            'Mumbai': (19.0760, 72.8777),
+            # Add more cities and their coordinates
+        }
+
+        city_data['Latitude'] = city_data['Original_City'].map(lambda x: city_coordinates.get(x, (0, 0))[0])
+        city_data['Longitude'] = city_data['Original_City'].map(lambda x: city_coordinates.get(x, (0, 0))[1])
 
         # Create a map centered on India
         m = folium.Map(location=[20.5937, 78.9629], zoom_start=5)
 
         # Add markers for each city
-        for idx, row in map_data.iterrows():
-            folium.CircleMarker(
-                location=[row['Latitude'], row['Longitude']],
-                radius=5,
-                popup=f"City: {row['City']}<br>AQI: {row['AQI']:.2f}",
-                color='red',
-                fill=True,
-                fillColor='red'
-            ).add_to(m)
+        for idx, row in city_data.iterrows():
+            if row['Latitude'] != 0 and row['Longitude'] != 0:
+                folium.CircleMarker(
+                    location=[row['Latitude'], row['Longitude']],
+                    radius=5,
+                    popup=f"City: {row['Original_City']}<br>AQI: {row['AQI']:.2f}",
+                    color='red',
+                    fill=True,
+                    fillColor='red'
+                ).add_to(m)
 
         # Display the map
         folium_static(m)
