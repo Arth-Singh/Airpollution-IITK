@@ -21,8 +21,6 @@ def load_model():
         st.error(f"Error loading model files: {e}")
         return None, None, None
 
-model, scaler, feature_names = load_model()
-
 # Load and preprocess the dataset
 @st.cache_data
 def load_data():
@@ -67,8 +65,6 @@ def load_data():
         st.error(f"Error loading data: {e}")
         return None
 
-df = load_data()
-
 # Function to preprocess input data
 def preprocess_input(input_data):
     input_df = pd.DataFrame([input_data])
@@ -107,96 +103,85 @@ def simulate_policy_impact(base_input, policy_changes):
     impact = new_aqi - base_aqi
     return base_aqi, new_aqi, impact
 
-# Streamlit app
-def main():
-    st.title("AQI Prediction and Policy Impact Simulator")
+# Function to create AQI prediction page
+def aqi_prediction_page():
+    st.header("AQI Prediction")
+    
+    # Create input fields for features
+    input_data = {}
 
-    if df is None or model is None:
-        st.error("Failed to load data or model. Please check the error messages above.")
-        return
+    # City selection dropdown
+    city_columns = [col for col in feature_names if col.startswith('City_')]
+    selected_city = st.selectbox("Select City", [col.replace('City_', '') for col in city_columns])
+    for city_col in city_columns:
+        input_data[city_col] = 1 if city_col == f'City_{selected_city}' else 0
 
-    # Sidebar for navigation
-    page = st.sidebar.selectbox("Choose a page", ["Prediction", "Policy Simulator", "Map Visualization"])
+    # Season selection dropdown
+    season_columns = [col for col in feature_names if col.startswith('Season_')]
+    selected_season = st.selectbox("Select Season", [col.replace('Season_', '') for col in season_columns])
+    for season_col in season_columns:
+        input_data[season_col] = 1 if season_col == f'Season_{selected_season}' else 0
 
-    if page == "Prediction":
-        st.header("AQI Prediction")
-        
-        # Create input fields for features
-        input_data = {}
+    # Sliders for numerical inputs
+    numerical_features = [f for f in feature_names if not f.startswith(('City_', 'Season_'))]
+    for feature in numerical_features:
+        input_data[feature] = st.slider(f"{feature}", min_value=0.0, max_value=500.0, value=0.0, step=0.1)
 
-        # City selection dropdown
-        city_columns = [col for col in feature_names if col.startswith('City_')]
-        selected_city = st.selectbox("Select City", [col.replace('City_', '') for col in city_columns])
-        for city_col in city_columns:
-            input_data[city_col] = 1 if city_col == f'City_{selected_city}' else 0
+    if st.button("Predict AQI"):
+        prediction = predict_aqi(input_data)
+        st.success(f"Predicted AQI: {prediction:.2f}")
 
-        # Season selection dropdown
-        season_columns = [col for col in feature_names if col.startswith('Season_')]
-        selected_season = st.selectbox("Select Season", [col.replace('Season_', '') for col in season_columns])
-        for season_col in season_columns:
-            input_data[season_col] = 1 if season_col == f'Season_{selected_season}' else 0
+# Function to create policy simulator page
+def policy_simulator_page():
+    st.header("Policy Impact Simulator")
+    
+    # Create input fields for base scenario
+    st.subheader("Base Scenario")
+    base_input = {}
+    
+    # City selection dropdown for base scenario
+    city_columns = [col for col in feature_names if col.startswith('City_')]
+    selected_city = st.selectbox("Select Base City", [col.replace('City_', '') for col in city_columns])
+    for city_col in city_columns:
+        base_input[city_col] = 1 if city_col == f'City_{selected_city}' else 0
 
-        # Sliders for numerical inputs
-        numerical_features = [f for f in feature_names if not f.startswith(('City_', 'Season_'))]
-        for feature in numerical_features:
-            # You might want to adjust min_value and max_value based on your data
-            input_data[feature] = st.slider(f"{feature}", min_value=0.0, max_value=500.0, value=0.0, step=0.1)
+    # Season selection dropdown for base scenario
+    season_columns = [col for col in feature_names if col.startswith('Season_')]
+    selected_season = st.selectbox("Select Base Season", [col.replace('Season_', '') for col in season_columns])
+    for season_col in season_columns:
+        base_input[season_col] = 1 if season_col == f'Season_{selected_season}' else 0
 
-        if st.button("Predict AQI"):
-            prediction = predict_aqi(input_data)
-            st.success(f"Predicted AQI: {prediction:.2f}")
+    # Sliders for numerical inputs in base scenario
+    numerical_features = [f for f in feature_names if not f.startswith(('City_', 'Season_'))]
+    for feature in numerical_features:
+        base_input[feature] = st.slider(f"Base {feature}", min_value=0.0, max_value=500.0, value=0.0, step=0.1)
 
-    elif page == "Policy Simulator":
-        st.header("Policy Impact Simulator")
-        
-        # Create input fields for base scenario
-        st.subheader("Base Scenario")
-        base_input = {}
-        
-        # City selection dropdown for base scenario
-        city_columns = [col for col in feature_names if col.startswith('City_')]
-        selected_city = st.selectbox("Select Base City", [col.replace('City_', '') for col in city_columns])
-        for city_col in city_columns:
-            base_input[city_col] = 1 if city_col == f'City_{selected_city}' else 0
+    # Create input fields for policy changes
+    st.subheader("Policy Changes (% change)")
+    policy_changes = {}
+    for feature in ['PM2.5', 'PM10', 'NO', 'NO2', 'CO', 'SO2']:
+        policy_changes[feature] = st.slider(f"Change in {feature}", -100.0, 100.0, 0.0) / 100
 
-        # Season selection dropdown for base scenario
-        season_columns = [col for col in feature_names if col.startswith('Season_')]
-        selected_season = st.selectbox("Select Base Season", [col.replace('Season_', '') for col in season_columns])
-        for season_col in season_columns:
-            base_input[season_col] = 1 if season_col == f'Season_{selected_season}' else 0
+    if st.button("Simulate Policy Impact"):
+        base_aqi, new_aqi, impact = simulate_policy_impact(base_input, policy_changes)
+        st.success(f"Base AQI: {base_aqi:.2f}")
+        st.success(f"New AQI: {new_aqi:.2f}")
+        st.info(f"Policy Impact: {impact:.2f}")
 
-        # Sliders for numerical inputs in base scenario
-        numerical_features = [f for f in feature_names if not f.startswith(('City_', 'Season_'))]
-        for feature in numerical_features:
-            base_input[feature] = st.slider(f"Base {feature}", min_value=0.0, max_value=500.0, value=0.0, step=0.1)
+        fig, ax = plt.subplots()
+        sns.barplot(x=['Base AQI', 'New AQI'], y=[base_aqi, new_aqi], ax=ax)
+        ax.set_ylabel('AQI')
+        ax.set_title('Policy Impact on AQI')
+        st.pyplot(fig)
 
-        # Create input fields for policy changes
-        st.subheader("Policy Changes (% change)")
-        policy_changes = {}
-        for feature in ['PM2.5', 'PM10', 'NO', 'NO2', 'CO', 'SO2']:
-            policy_changes[feature] = st.slider(f"Change in {feature}", -100.0, 100.0, 0.0) / 100
-
-        if st.button("Simulate Policy Impact"):
-            base_aqi, new_aqi, impact = simulate_policy_impact(base_input, policy_changes)
-            st.success(f"Base AQI: {base_aqi:.2f}")
-            st.success(f"New AQI: {new_aqi:.2f}")
-            st.info(f"Policy Impact: {impact:.2f}")
-
-            
-            fig, ax = plt.subplots()
-    sns.barplot(x=['Base AQI', 'New AQI'], y=[base_aqi, new_aqi], ax=ax)
-    ax.set_ylabel('AQI')
-    ax.set_title('Policy Impact on AQI')
-    st.pyplot(fig)
-
-elif page == "Map Visualization":
+# Function to create map visualization page
+def map_visualization_page():
     st.header("Global AQI Map Visualization")
     
     # Prepare data for map
     city_data = df.groupby('Original_City').agg({
         'AQI': 'mean'
     }).reset_index()
-   
 
     # Add latitude and longitude for major global cities
     city_coordinates = {
@@ -278,5 +263,29 @@ elif page == "Map Visualization":
 
     # Display the map
     folium_static(m)
+
+# Main Streamlit app
+def main():
+    st.title("AQI Prediction and Policy Impact Simulator")
+
+    # Load model and data
+    global model, scaler, feature_names, df
+    model, scaler, feature_names = load_model()
+    df = load_data()
+
+    if df is None or model is None:
+        st.error("Failed to load data or model. Please check the error messages above.")
+        return
+
+    # Sidebar for navigation
+    page = st.sidebar.selectbox("Choose a page", ["Prediction", "Policy Simulator", "Map Visualization"])
+
+    if page == "Prediction":
+        aqi_prediction_page()
+    elif page == "Policy Simulator":
+        policy_simulator_page()
+    elif page == "Map Visualization":
+        map_visualization_page()
+
 if __name__ == "__main__":
     main()
