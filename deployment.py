@@ -192,38 +192,93 @@ def main():
     elif page == "Map Visualization":
         st.header("AQI Map Visualization")
         
-        # Prepare data for map
-        city_data = df.groupby('Original_City').agg({
-            'AQI': 'mean'
-        }).reset_index()
+        elif page == "Map Visualization":
+    st.header("Global AQI Map Visualization")
+    
+    # Prepare data for map
+    city_data = df.groupby('Original_City').agg({
+        'AQI': 'mean'
+    }).reset_index()
 
-        # Add latitude and longitude (you'll need to provide this data)
-        city_coordinates = {
-            'Delhi': (28.6139, 77.2090),
-            'Mumbai': (19.0760, 72.8777),
-            # Add more cities and their coordinates
-        }
+    # Add latitude and longitude for major global cities
+    city_coordinates = {
+        'New York': (40.7128, -74.0060),
+        'Los Angeles': (34.0522, -118.2437),
+        'Chicago': (41.8781, -87.6298),
+        'London': (51.5074, -0.1278),
+        'Paris': (48.8566, 2.3522),
+        'Tokyo': (35.6762, 139.6503),
+        'Beijing': (39.9042, 116.4074),
+        'Delhi': (28.6139, 77.2090),
+        'Mumbai': (19.0760, 72.8777),
+        'São Paulo': (-23.5505, -46.6333),
+        'Mexico City': (19.4326, -99.1332),
+        'Cairo': (30.0444, 31.2357),
+        'Moscow': (55.7558, 37.6173),
+        'Istanbul': (41.0082, 28.9784),
+        'Dubai': (25.2048, 55.2708),
+        'Singapore': (1.3521, 103.8198),
+        'Sydney': (-33.8688, 151.2093),
+        'Johannesburg': (-26.2041, 28.0473),
+        'Toronto': (43.6532, -79.3832),
+        'Berlin': (52.5200, 13.4050),
+    }
 
-        city_data['Latitude'] = city_data['Original_City'].map(lambda x: city_coordinates.get(x, (0, 0))[0])
-        city_data['Longitude'] = city_data['Original_City'].map(lambda x: city_coordinates.get(x, (0, 0))[1])
+    city_data['Latitude'] = city_data['Original_City'].map(lambda x: city_coordinates.get(x, (0, 0))[0])
+    city_data['Longitude'] = city_data['Original_City'].map(lambda x: city_coordinates.get(x, (0, 0))[1])
 
-        # Create a map centered on India
-        m = folium.Map(location=[20.5937, 78.9629], zoom_start=5)
+    # Remove cities with no coordinates
+    city_data = city_data[city_data['Latitude'] != 0]
 
-        # Add markers for each city
-        for idx, row in city_data.iterrows():
-            if row['Latitude'] != 0 and row['Longitude'] != 0:
-                folium.CircleMarker(
-                    location=[row['Latitude'], row['Longitude']],
-                    radius=5,
-                    popup=f"City: {row['Original_City']}<br>AQI: {row['AQI']:.2f}",
-                    color='red',
-                    fill=True,
-                    fillColor='red'
-                ).add_to(m)
+    # Create a world map
+    m = folium.Map(location=[0, 0], zoom_start=2)
 
-        # Display the map
-        folium_static(m)
+    # Define a color function based on AQI
+    def get_color(aqi):
+        if aqi <= 50:
+            return '#00e400'  # Green
+        elif aqi <= 100:
+            return '#ffff00'  # Yellow
+        elif aqi <= 150:
+            return '#ff7e00'  # Orange
+        elif aqi <= 200:
+            return '#ff0000'  # Red
+        elif aqi <= 300:
+            return '#8f3f97'  # Purple
+        else:
+            return '#7e0023'  # Maroon
 
+    # Add colored circles for each city
+    for idx, row in city_data.iterrows():
+        folium.CircleMarker(
+            location=[row['Latitude'], row['Longitude']],
+            radius=10,
+            popup=f"City: {row['Original_City']}<br>AQI: {row['AQI']:.2f}",
+            color=get_color(row['AQI']),
+            fill=True,
+            fillColor=get_color(row['AQI']),
+            fillOpacity=0.7
+        ).add_to(m)
+
+    # Add a color legend
+    legend_html = '''
+         <div style="position: fixed; 
+                     bottom: 50px; left: 50px; width: 120px; height: 180px; 
+                     border:2px solid grey; z-index:9999; font-size:14px;
+                     background-color:white;
+                     ">
+         <p style="margin-bottom: 5px; margin-left: 5px;"><strong>AQI Legend</strong></p>
+         <p style="margin: 0; background-color: #00e400;">&nbsp;0-50: Good</p>
+         <p style="margin: 0; background-color: #ffff00;">&nbsp;51-100: Moderate</p>
+         <p style="margin: 0; background-color: #ff7e00;">&nbsp;101-150: Unhealthy for Sensitive Groups</p>
+         <p style="margin: 0; background-color: #ff0000;">&nbsp;151-200: Unhealthy</p>
+         <p style="margin: 0; background-color: #8f3f97;">&nbsp;201-300: Very Unhealthy</p>
+         <p style="margin: 0; background-color: #7e0023; color: white;">&nbsp;301+: Hazardous</p>
+         </div>
+         '''
+    m.get_root().html.add_child(folium.Element(legend_html))
+
+    # Display the map
+    folium_static(m)
 if __name__ == "__main__":
     main()
